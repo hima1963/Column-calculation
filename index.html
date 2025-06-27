@@ -1,0 +1,112 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Concrete Column Design (Egyptian Code - ULS)</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 30px; }
+    h2 { color: #2c3e50; }
+    label { display: block; margin-top: 15px; }
+    input { padding: 5px; width: 100px; }
+    #output { margin-top: 30px; padding: 20px; background-color: #f9f9f9; border: 1px solid #ccc; }
+    canvas { border: 1px solid #aaa; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h2>Concrete Column Design (ULS - Egyptian Code)</h2>
+  <form id="designForm">
+    <label>Column Height (m): <input type="number" step="0.1" id="H" value="3"></label>
+    <label>Section Width b (cm): <input type="number" id="b" value="30"></label>
+    <label>Section Height h (cm): <input type="number" id="h" value="30"></label>
+    <label>Fcu (kg/cm²): <input type="number" id="Fcu" value="250"></label>
+    <label>Fy (kg/cm²): <input type="number" id="Fy" value="3600"></label>
+    <label>Fs (kg/cm²): <input type="number" id="Fs" value="2400"></label>
+    <label>Concrete Cover (cm): <input type="number" id="cover" value="2.5"></label>
+    <label>Main Rebar Diameter (mm): <input type="number" id="phi_long" value="16"></label>
+    <label>Stirrups Diameter (mm): <input type="number" id="phi_tie" value="8"></label>
+    <label>Axial Load Pu (ton): <input type="number" id="Pu" value="100"></label>
+    <label>Bending Moment Mu (ton.m): <input type="number" id="Mu" value="2"></label>
+    <button type="button" onclick="calculateDesign()">Calculate</button>
+  </form>
+
+  <div id="output"></div>
+  <canvas id="columnCanvas" width="400" height="400"></canvas>
+
+  <script>
+    function calculateDesign() {
+      const H = parseFloat(document.getElementById('H').value);
+      const b = parseFloat(document.getElementById('b').value);
+      const h = parseFloat(document.getElementById('h').value);
+      const Fcu = parseFloat(document.getElementById('Fcu').value);
+      const Fy = parseFloat(document.getElementById('Fy').value);
+      const Fs = parseFloat(document.getElementById('Fs').value);
+      const cover = parseFloat(document.getElementById('cover').value);
+      const phi_long = parseFloat(document.getElementById('phi_long').value) / 10;
+      const phi_tie = parseFloat(document.getElementById('phi_tie').value) / 10;
+      const Pu = parseFloat(document.getElementById('Pu').value) * 1000000;
+      const Mu = parseFloat(document.getElementById('Mu').value) * 100000;
+
+      const phi = 0.65;
+      const Ac = b * h;
+      const As_min = 0.008 * Ac;
+      const As_max = 0.06 * Ac;
+      const area_bar = Math.PI * Math.pow(phi_long / 2, 2);
+      const trial_n = 6;
+      const As_try = trial_n * area_bar;
+      const d = h - cover - phi_tie - phi_long / 2;
+      const a = As_try * Fy / (0.85 * Fcu * b);
+      const Mu_resisting = phi * (0.67 * Fy * As_try) * (d - a / 2);
+      const Nu_resisting = phi * (0.4 * Fcu * b * d + 0.67 * Fy * As_try);
+
+      const output = `
+        <h3>Results</h3>
+        <p>Effective Depth (d): ${d.toFixed(2)} cm</p>
+        <p>Steel Area Used (As): ${As_try.toFixed(2)} cm²</p>
+        <p>Axial Load Pu: ${(Pu / 1e6).toFixed(2)} ton</p>
+        <p>Axial Capacity: ${(Nu_resisting / 1e6).toFixed(2)} ton → ${Nu_resisting >= Pu ? 'OK' : 'Not OK'}</p>
+        <p>Bending Moment Mu: ${(Mu / 1e5).toFixed(2)} ton.m</p>
+        <p>Moment Capacity: ${(Mu_resisting / 1e5).toFixed(2)} ton.m → ${Mu_resisting >= Mu ? 'OK' : 'Not OK'}</p>
+      `;
+      document.getElementById('output').innerHTML = output;
+      drawColumn(b, h, cover, phi_tie, phi_long);
+    }
+
+    function drawColumn(b, h, cover, phi_tie, phi_long) {
+      const canvas = document.getElementById('columnCanvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const scale = 4;
+      const bw = b * scale;
+      const bh = h * scale;
+      const offsetX = 20;
+      const offsetY = 20;
+
+      ctx.fillStyle = '#ddd';
+      ctx.fillRect(offsetX, offsetY, bw, bh);
+
+      const tie = cover * scale;
+      ctx.strokeStyle = 'blue';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(offsetX + tie, offsetY + tie, bw - 2 * tie, bh - 2 * tie);
+
+      const bar_r = phi_long / 2 * scale;
+      const positions = [
+        [offsetX + tie + bar_r, offsetY + tie + bar_r],
+        [offsetX + bw - tie - bar_r, offsetY + tie + bar_r],
+        [offsetX + tie + bar_r, offsetY + bh - tie - bar_r],
+        [offsetX + bw - tie - bar_r, offsetY + bh - tie - bar_r],
+        [offsetX + bw / 2, offsetY + tie + bar_r],
+        [offsetX + bw / 2, offsetY + bh - tie - bar_r],
+      ];
+      ctx.fillStyle = 'red';
+      for (const [x, y] of positions) {
+        ctx.beginPath();
+        ctx.arc(x, y, bar_r, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    }
+  </script>
+</body>
+</html>
